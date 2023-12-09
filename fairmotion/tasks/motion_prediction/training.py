@@ -12,12 +12,16 @@ import torch.nn as nn
 from fairmotion.tasks.motion_prediction import generate, utils, test
 from fairmotion.utils import utils as fairmotion_utils
 
+from icecream import ic
+from tqdm import tqdm, trange
 
-logging.basicConfig(
-    format="[%(asctime)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO,
-)
+# logging.basicConfig(
+#     # filename=f"{args.save_model_path}/best.model",
+#     # filemode='a',
+#     format="[%(asctime)s] %(message)s",
+#     datefmt="%Y-%m-%d %H:%M:%S",
+#     level=logging.INFO,
+# )
 
 
 def set_seeds():
@@ -30,6 +34,13 @@ def set_seeds():
 
 def train(args):
     fairmotion_utils.create_dir_if_absent(args.save_model_path)
+    logging.basicConfig(
+        filename=f"{args.save_model_path}/log.txt",
+        filemode="a",
+        format="[%(asctime)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO,
+    )
     logging.info(args._get_kwargs())
     utils.log_config(args.save_model_path, args)
 
@@ -67,16 +78,26 @@ def train(args):
     model.init_weights()
     training_losses, val_losses = [], []
 
+    logging.info("Preparing eval...")
     epoch_loss = 0
-    for iterations, (src_seqs, tgt_seqs) in enumerate(dataset["train"]):
+    for iterations, (src_seqs, tgt_seqs) in tqdm(enumerate(dataset["train"])):
         model.eval()
         src_seqs, tgt_seqs = src_seqs.to(device), tgt_seqs.to(device)
-        outputs = model(src_seqs, tgt_seqs, teacher_forcing_ratio=1,)
+        with torch.no_grad():
+            outputs = model(
+                src_seqs,
+                tgt_seqs,
+                teacher_forcing_ratio=1,
+            )
         loss = criterion(outputs, tgt_seqs)
         epoch_loss += loss.item()
     epoch_loss = epoch_loss / num_training_sequences
     val_loss = generate.eval(
-        model, criterion, dataset["validation"], args.batch_size, device,
+        model,
+        criterion,
+        dataset["validation"],
+        args.batch_size,
+        device,
     )
     logging.info(
         "Before training: "
@@ -91,13 +112,14 @@ def train(args):
         epoch_loss = 0
         model.train()
         teacher_forcing_ratio = np.clip(
-            (1 - 2 * epoch / args.epochs), a_min=0, a_max=1,
+            (1 - 2 * epoch / args.epochs),
+            a_min=0,
+            a_max=1,
         )
         logging.info(
-            f"Running epoch {epoch} | "
-            f"teacher_forcing_ratio={teacher_forcing_ratio}"
+            f"Running epoch {epoch} | " f"teacher_forcing_ratio={teacher_forcing_ratio}"
         )
-        for iterations, (src_seqs, tgt_seqs) in enumerate(dataset["train"]):
+        for iterations, (src_seqs, tgt_seqs) in tqdm(enumerate(dataset["train"])):
             opt.optimizer.zero_grad()
             src_seqs, tgt_seqs = src_seqs.to(device), tgt_seqs.to(device)
             outputs = model(
@@ -114,7 +136,11 @@ def train(args):
         epoch_loss = epoch_loss / num_training_sequences
         training_losses.append(epoch_loss)
         val_loss = generate.eval(
-            model, criterion, dataset["validation"], args.batch_size, device,
+            model,
+            criterion,
+            dataset["validation"],
+            args.batch_size,
+            device,
         )
         val_losses.append(val_loss)
         opt.epoch_step(val_loss=val_loss)
@@ -135,13 +161,10 @@ def train(args):
                 max_len=tgt_len,
             )
             logging.info(f"Validation MAE: {mae}")
-            torch.save(
-                model.state_dict(), f"{args.save_model_path}/{epoch}.model"
-            )
+            torch.save(model.state_dict(), f"{args.save_model_path}/{epoch}.model")
             if len(val_losses) == 0 or val_loss <= min(val_losses):
-                torch.save(
-                    model.state_dict(), f"{args.save_model_path}/best.model"
-                )
+                torch.save(model.state_dict(), f"{args.save_model_path}/best.model")
+            plot_curves(args, training_losses, val_losses)
     return training_losses, val_losses
 
 
@@ -151,6 +174,7 @@ def plot_curves(args, training_losses, val_losses):
     plt.ylabel("MSE Loss")
     plt.xlabel("Epoch")
     plt.savefig(f"{args.save_model_path}/loss.svg", format="svg")
+    plt.savefig(f"{args.save_model_path}/loss.png", format="png")
 
 
 def main(args):
@@ -172,7 +196,8 @@ if __name__ == "__main__":
         "--batch-size", type=int, help="Batch size for training", default=64
     )
     parser.add_argument(
-        "--shuffle", action='store_true',
+        "--shuffle",
+        action="store_true",
         help="Use this option to enable shuffling",
     )
     parser.add_argument(
@@ -196,8 +221,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save-model-frequency",
         type=int,
-        help="Frequency (in terms of number of epochs) at which model is "
-        "saved",
+        help="Frequency (in terms of number of epochs) at which model is " "saved",
         default=5,
     )
     parser.add_argument(
@@ -224,7 +248,10 @@ if __name__ == "__main__":
         ],
     )
     parser.add_argument(
-        "--lr", type=float, help="Learning rate", default=None,
+        "--lr",
+        type=float,
+        help="Learning rate",
+        default=None,
     )
     parser.add_argument(
         "--optimizer",

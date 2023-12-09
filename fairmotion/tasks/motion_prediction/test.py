@@ -12,6 +12,8 @@ from fairmotion.core import motion as motion_class
 from fairmotion.tasks.motion_prediction import generate, metrics, utils
 from fairmotion.ops import conversions, motion as motion_ops
 
+from fairmotion.utils import utils as fairmotion_utils
+
 
 logging.basicConfig(
     format="[%(asctime)s] %(message)s",
@@ -82,8 +84,8 @@ def save_motion_files(seqs_T, args):
     amass_dip_motion = amass_dip.load(
         file=None, load_skel=True, load_motion=False,
     )
-    utils.create_dir_if_absent(os.path.join(args.save_output_path, "ref"))
-    utils.create_dir_if_absent(os.path.join(args.save_output_path, "pred"))
+    fairmotion_utils.create_dir_if_absent(os.path.join(args.save_output_path, "ref"))
+    fairmotion_utils.create_dir_if_absent(os.path.join(args.save_output_path, "pred"))
 
     pool = Pool(10)
     indices = range(len(seqs_T[0]))
