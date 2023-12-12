@@ -43,6 +43,7 @@ def train(args):
     )
     logging.info(args._get_kwargs())
     utils.log_config(args.save_model_path, args)
+    logger = open(f"{args.save_model_path}/logger.txt", "a")
 
     set_seeds()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -104,6 +105,7 @@ def train(args):
         f"Training loss {epoch_loss} | "
         f"Validation loss {val_loss}"
     )
+    logger.write(f"0,{epoch_loss},{val_loss}\n")
 
     logging.info("Training model...")
     torch.autograd.set_detect_anomaly(True)
@@ -149,9 +151,10 @@ def train(args):
             f"Validation loss {val_loss} | "
             f"Iterations {iterations + 1}"
         )
+        logger.write(f"{iterations + 1},{epoch_loss},{val_loss}\n")
         if epoch % args.save_model_frequency == 0:
             _, rep = os.path.split(args.preprocessed_path.strip("/"))
-            _, mae = test.test_model(
+            _, mae, ee = test.test_model(
                 model=model,
                 dataset=dataset["validation"],
                 rep=rep,
@@ -161,18 +164,23 @@ def train(args):
                 max_len=tgt_len,
             )
             logging.info(f"Validation MAE: {mae}")
+            logging.info(f"Validation Euler: {ee}")
             torch.save(model.state_dict(), f"{args.save_model_path}/{epoch}.model")
             if len(val_losses) == 0 or val_loss <= min(val_losses):
                 torch.save(model.state_dict(), f"{args.save_model_path}/best.model")
             plot_curves(args, training_losses, val_losses)
+    logger.close()
     return training_losses, val_losses
 
 
 def plot_curves(args, training_losses, val_losses):
-    plt.plot(range(len(training_losses)), training_losses)
-    plt.plot(range(len(val_losses)), val_losses)
+    plt.clf()
+    plt.plot(range(len(training_losses)), training_losses, label="Training")
+    plt.plot(range(len(val_losses)), val_losses, label="Validation")
     plt.ylabel("MSE Loss")
     plt.xlabel("Epoch")
+    plt.legend()
+    plt.title(args.architecture)
     plt.savefig(f"{args.save_model_path}/loss.svg", format="svg")
     plt.savefig(f"{args.save_model_path}/loss.png", format="png")
 
@@ -245,6 +253,7 @@ if __name__ == "__main__":
             "transformer",
             "transformer_encoder",
             "rnn",
+            "custom",
         ],
     )
     parser.add_argument(

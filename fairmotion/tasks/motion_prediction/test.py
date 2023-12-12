@@ -105,7 +105,8 @@ def calculate_metrics(pred_seqs, tgt_seqs):
     )
     euler_error = np.mean(euler_error, axis=0)
     mae = {frame: np.sum(euler_error[:frame]) for frame in metric_frames}
-    return mae
+    ee = {frame: euler_error[frame-1] for frame in metric_frames}
+    return mae, ee
 
 
 def test_model(model, dataset, rep, device, mean, std, max_len=None):
@@ -116,8 +117,8 @@ def test_model(model, dataset, rep, device, mean, std, max_len=None):
     # Calculate metric only when generated sequence has same shape as reference
     # target sequence
     if len(pred_seqs) > 0 and pred_seqs[0].shape == tgt_seqs[0].shape:
-        mae = calculate_metrics(seqs_T[0], seqs_T[2])
-    return seqs_T, mae
+        mae, ee = calculate_metrics(seqs_T[0], seqs_T[2])
+    return seqs_T, mae, ee
 
 
 def main(args):
@@ -146,12 +147,16 @@ def main(args):
 
     logging.info("Running model")
     _, rep = os.path.split(args.preprocessed_path.strip("/"))
-    seqs_T, mae = test_model(
-        model, dataset["test"], rep, device, mean, std, args.max_len
+    seqs_T, mae, ee = test_model(
+        model, dataset["validation"], rep, device, mean, std, args.max_len
     )
     logging.info(
         "Test MAE: "
         + " | ".join([f"{frame}: {mae[frame]}" for frame in mae.keys()])
+    )
+    logging.info(
+        "Test Euler: "
+        + " | ".join([f"{frame}: {ee[frame]}" for frame in ee.keys()])
     )
 
     if args.save_output_path:

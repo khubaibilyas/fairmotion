@@ -138,6 +138,10 @@ def prepare_model(
         model = transformer.TransformerModel(
             input_dim, hidden_dim, 4, hidden_dim, num_layers,
         )
+    elif architecture == "custom":
+        model = transformer.TransformerModel(
+            input_dim, hidden_dim, 4, hidden_dim, num_layers,
+        )
     model = model.to(device)
     model.zero_grad()
     model.double()
