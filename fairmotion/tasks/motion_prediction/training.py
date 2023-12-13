@@ -153,7 +153,7 @@ def train(args):
             f"Validation loss {val_loss} | "
             f"Iterations {iterations + 1}"
         )
-        logger.write(f"{iterations + 1},{epoch_loss},{val_loss}\n")
+        logger.write(f"{epoch + 1},{epoch_loss},{val_loss}\n")
         if epoch % args.save_model_frequency == 0:
             _, rep = os.path.split(args.preprocessed_path.strip("/"))
             _, mae, ee = test.test_model(
