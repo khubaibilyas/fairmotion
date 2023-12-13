@@ -74,6 +74,8 @@ def train(args):
         num_layers=args.num_layers,
         architecture=args.architecture,
     )
+    if args.ckpt is not None:
+        model.load_state_dict(torch.load(args.ckpt))
 
     criterion = nn.MSELoss()
     model.init_weights()
@@ -110,7 +112,7 @@ def train(args):
     logging.info("Training model...")
     torch.autograd.set_detect_anomaly(True)
     opt = utils.prepare_optimizer(model, args.optimizer, args.lr)
-    for epoch in range(args.epochs):
+    for epoch in range(args.start_epoch, args.epochs):
         epoch_loss = 0
         model.train()
         teacher_forcing_ratio = np.clip(
@@ -236,6 +238,9 @@ if __name__ == "__main__":
         "--epochs", type=int, help="Number of training epochs", default=200
     )
     parser.add_argument(
+        "--start_epoch", type=int, help="Epoch to start at", default=0
+    )
+    parser.add_argument(
         "--device",
         type=str,
         help="Training device",
@@ -268,6 +273,12 @@ if __name__ == "__main__":
         help="Torch optimizer",
         default="sgd",
         choices=["adam", "sgd", "noamopt"],
+    )
+    parser.add_argument(
+        "--ckpt",
+        type=str,
+        help="Path do checkpoint",
+        default=None,
     )
     args = parser.parse_args()
     main(args)
