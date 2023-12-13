@@ -163,6 +163,44 @@ def main(args):
         logging.info("Saving results")
         save_motion_files(seqs_T, args)
 
+def create_table(args, save_model_path):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logging.info("Preparing dataset")
+    dataset, mean, std = utils.prepare_dataset(
+        *[
+            os.path.join(args.preprocessed_path, f"{split}.pkl")
+            for split in ["train", "test", "validation"]
+        ],
+        batch_size=args.batch_size,
+        device=device,
+        shuffle=args.shuffle,
+    )
+    # number of predictions per time step = num_joints * angle representation
+    data_shape = next(iter(dataset["train"]))[0].shape
+    num_predictions = data_shape[-1]
+
+    logging.info("Preparing model")
+    model = prepare_model(
+        f"{save_model_path}/{args.epoch if args.epoch else 'best'}.model",
+        num_predictions,
+        args,
+        device,
+    )
+
+    logging.info("Running model")
+    _, rep = os.path.split(args.preprocessed_path.strip("/"))
+    seqs_T, mae, ee = test_model(
+        model, dataset["validation"], rep, device, mean, std, args.max_len
+    )
+    logging.info(
+        "Test MAE: "
+        + " | ".join([f"{frame}: {mae[frame]}" for frame in mae.keys()])
+    )
+    logging.info(
+        "Test Euler: "
+        + " | ".join([f"{frame}: {ee[frame]}" for frame in ee.keys()])
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -178,7 +216,7 @@ if __name__ == "__main__":
         "--save-model-path",
         type=str,
         help="Path to saved models",
-        required=True,
+        default=None,
     )
     parser.add_argument(
         "--save-output-path",
@@ -230,4 +268,12 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    main(args)
+    if args.save_model_path:
+        main(args)
+    else:
+        for arch in ["rnn", "seq2seq", "transformer_encoder", "transformer", "custom"]:
+            path = f"runs/{arch}"
+            print(f"Running {arch} ...")
+            args.architecture = arch
+            args.hidden_dim = 1024 if arch not in ["seq2seq", "custom"] else 256
+            create_table(args, path)
