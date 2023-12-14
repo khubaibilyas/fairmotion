@@ -13,6 +13,10 @@ Reference [original README](README-facebook.md) for licensing information and ad
 git clone https://github.com/iabdulhafiz/fairmotion.git
 ```
 
+## Dataset Download
+
+We downloaded the Synthetic 60FPS zip from the [AMASS DIP site](https://dip.is.tuebingen.mpg.de/).
+
 ## Preprocessing, Training, and Validation
 
 We mainly referenced the provided [readme under the motion prediction task section](https://github.com/iabdulhafiz/fairmotion/blob/main/fairmotion/tasks/motion_prediction/README.md).
